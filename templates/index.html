@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户反馈分析系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .accordion-content.open {
+            max-height: 2000px;
+            transition: max-height 0.5s ease-in;
+        }
+        .upload-zone {
+            border: 2px dashed #CBD5E1;
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #3B82F6;
+            background-color: #EFF6FF;
+        }
+        .category-panel {
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .feedback-item {
+            font-size: 13px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .feedback-item:last-child {
+            border-bottom: none;
+        }
+        .stat-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- 顶部导航 -->
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div class="max-w-full mx-auto px-4 py-2">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <h1 class="text-base font-bold text-gray-800">用户反馈分析</h1>
+                </div>
+                <div class="flex items-center space-x-3">
+                    {% if batches %}
+                    <select id="batchSelect" onchange="switchBatch(this.value)" class="border border-gray-300 rounded px-2 py-1 text-sm">
+                        {% for batch in batches %}
+                        <option value="{{ batch.id }}" {% if current_batch and current_batch.id == batch.id %}selected{% endif %}>
+                            {{ batch.filename }} ({{ batch.total_count }}条)
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if current_batch %}
+                    <button onclick="exportData({{ current_batch.id }})" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
+                        📥 导出
+                    </button>
+                    <button onclick="deleteBatch({{ current_batch.id }})" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                        🗑️ 删除
+                    </button>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-full mx-auto px-4 py-3">
+        <!-- 上传区域 + 统计信息 横向排列 -->
+        <div class="flex gap-4 mb-4">
+            <!-- 上传区域 -->
+            <div class="bg-white rounded-lg shadow-sm p-4 w-64 flex-shrink-0">
+                <h2 class="text-sm font-semibold text-gray-700 mb-2">📤 上传CSV</h2>
+                <div id="uploadZone" class="upload-zone rounded-lg p-4 text-center cursor-pointer"
+                     onclick="document.getElementById('fileInput').click()">
+                    <input type="file" id="fileInput" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
+                    <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <p class="text-xs text-gray-500">点击或拖拽上传</p>
+                </div>
+                <div id="uploadStatus" class="mt-2 hidden">
+                    <div class="flex items-center justify-center space-x-1">
+                        <svg class="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-xs text-blue-500">分析中...</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if stats %}
+            <!-- 统计概览 -->
+            <div class="flex-1 bg-white rounded-lg shadow-sm p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-gray-700">📊 统计概览</h2>
+                    <div class="flex gap-4 text-sm">
+                        <span class="text-blue-600 font-medium">总计: {{ stats.total }}</span>
+                        {% for user_type, count in stats.user_distribution.items() %}
+                        <span class="text-gray-600">{{ user_type }}: {{ count }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    {% for cat_stat in stats.category_stats %}
+                    <div class="flex items-center bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-blue-50" onclick="toggleCategory('{{ cat_stat.category }}')">
+                        <span class="text-sm text-gray-700">{{ cat_stat.category }}</span>
+                        <span class="ml-2 bg-blue-500 text-white rounded-full stat-badge">{{ cat_stat.count }}</span>
+                        <span class="ml-1 text-xs text-gray-400">({{ (cat_stat.count / stats.total * 100)|round(1) }}%)</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if grouped_feedbacks %}
+        <!-- 分类详情 - 并列网格布局 -->
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {% for category, feedbacks in grouped_feedbacks.items() %}
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden" id="panel-{{ loop.index }}">
+                <!-- 分类标题 -->
+                <div class="bg-gray-50 px-3 py-2 border-b flex items-center justify-between cursor-pointer" onclick="togglePanel({{ loop.index }})">
+                    <div class="flex items-center">
+                        <span class="font-medium text-sm text-gray-800">{{ category }}</span>
+                        <span class="ml-2 bg-blue-500 text-white text-xs rounded-full px-2 py-0.5">{{ feedbacks|length }}</span>
+                    </div>
+                    <svg class="panel-icon-{{ loop.index }} w-4 h-4 text-gray-400 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <!-- 分类内容 - 默认展开 -->
+                <div class="panel-content-{{ loop.index }} category-panel open" style="max-height: 400px;">
+                    {% for feedback in feedbacks %}
+                    <div class="feedback-item hover:bg-gray-50">
+                        <div class="flex items-start justify-between">
+                            <p class="text-gray-700 flex-1 leading-relaxed">{{ feedback.content }}</p>
+                            <span class="ml-2 text-xs px-1.5 py-0.5 rounded flex-shrink-0
+                                {% if feedback.user_type == '会员' %}
+                                bg-green-100 text-green-700
+                                {% else %}
+                                bg-gray-100 text-gray-600
+                                {% endif %}">
+                                {{ feedback.user_type }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- 空状态 -->
+        <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+            <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h3 class="text-base font-medium text-gray-700 mb-1">暂无数据</h3>
+            <p class="text-sm text-gray-500">请上传CSV文件开始分析</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- 提示框 -->
+    <div id="toast" class="fixed bottom-4 right-4 transform translate-y-full opacity-0 transition-all duration-300 z-50">
+        <div class="bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 text-sm">
+            <svg id="toastIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        // 文件上传
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            if (event.target.files[0]) {
+                handleFile(event.target.files[0]);
+            }
+        }
+
+        async function handleFile(file) {
+            if (!file.name.endsWith('.csv')) {
+                showToast('请上传CSV文件', 'error');
+                return;
+            }
+            uploadStatus.classList.remove('hidden');
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => window.location.href = '/batch/' + result.batch_id, 800);
+                } else {
+                    showToast(result.detail || '上传失败', 'error');
+                }
+            } catch (error) {
+                showToast('上传出错: ' + error.message, 'error');
+            } finally {
+                uploadStatus.classList.add('hidden');
+                fileInput.value = '';
+            }
+        }
+
+        // 切换批次
+        function switchBatch(batchId) {
+            window.location.href = '/batch/' + batchId;
+        }
+
+        // 删除批次
+        async function deleteBatch(batchId) {
+            if (!confirm('确定要删除这条历史记录吗？')) return;
+            try {
+                const response = await fetch('/batch/' + batchId, { method: 'DELETE' });
+                if (response.ok) {
+                    showToast('删除成功', 'success');
+                    setTimeout(() => window.location.href = '/', 800);
+                }
+            } catch (error) {
+                showToast('删除失败', 'error');
+            }
+        }
+
+        // 导出数据
+        function exportData(batchId) {
+            window.location.href = '/export/' + batchId;
+        }
+
+        // 切换面板展开/收起
+        function togglePanel(index) {
+            const content = document.querySelector('.panel-content-' + index);
+            const icon = document.querySelector('.panel-icon-' + index);
+            
+            if (content.style.maxHeight === '0px') {
+                content.style.maxHeight = '400px';
+                icon.classList.add('rotate-180');
+            } else {
+                content.style.maxHeight = '0px';
+                icon.classList.remove('rotate-180');
+            }
+        }
+
+        // 点击统计标签滚动到对应分类
+        function toggleCategory(category) {
+            const panels = document.querySelectorAll('[id^="panel-"]');
+            panels.forEach(panel => {
+                const title = panel.querySelector('.font-medium');
+                if (title && title.textContent.trim() === category) {
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    panel.classList.add('ring-2', 'ring-blue-400');
+                    setTimeout(() => panel.classList.remove('ring-2', 'ring-blue-400'), 2000);
+                }
+            });
+        }
+
+        // 提示框
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.textContent = message;
+            if (type === 'error') {
+                toastIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+                toast.querySelector('div').className = 'bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 text-sm';
+            } else {
+                toastIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+                toast.querySelector('div').className = 'bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 text-sm';
+            }
+            toast.classList.remove('translate-y-full', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-full', 'opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>
