@@ -6,8 +6,8 @@ import io
 import json
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, Response, abort
 
-from app import models as db
-from app.services import feedback_classifier, user_type_parser, csv_column_detector
+from core import models as db
+from core.services import feedback_classifier, user_type_parser, csv_column_detector
 
 # 创建蓝图
 main_bp = Blueprint('main', __name__)

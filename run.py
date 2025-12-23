@@ -1,8 +1,8 @@
 """
-应用入口文件
+应用入口文件（本地开发用）
 """
 import os
-from app import create_app
+from core import create_app
 from config import config
 
 # 获取环境配置
@@ -25,4 +25,3 @@ if __name__ == '__main__':
         port=config_obj.PORT,
         debug=config_obj.DEBUG
     )
-

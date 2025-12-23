@@ -21,12 +21,12 @@ def create_app(config_name='default'):
     app.config.from_object(config[config_name])
     
     # 初始化数据库
-    from app.models import init_db
+    from core.models import init_db
     with app.app_context():
         init_db()
     
     # 注册蓝图
-    from app.routes import main_bp, api_bp
+    from core.routes import main_bp, api_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     
