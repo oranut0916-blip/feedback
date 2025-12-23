@@ -8,6 +8,15 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-feedback-analysis'
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATABASE_PATH = os.path.join(BASE_DIR, 'feedback.db')
+
+
+class VercelConfig(Config):
+    """Vercel 部署配置"""
+    DEBUG = False
+    HOST = '0.0.0.0'
+    PORT = 8000
+    # Vercel Serverless 只能写入 /tmp 目录
+    DATABASE_PATH = '/tmp/feedback.db'
     
     # 上传配置
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
@@ -32,6 +41,7 @@ class ProductionConfig(Config):
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'vercel': VercelConfig,
     'default': DevelopmentConfig
 }
 
