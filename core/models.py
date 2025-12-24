@@ -43,8 +43,8 @@ def get_connection():
             g.db_type = 'postgres'
         else:
             import sqlite3
-            g.db = sqlite3.connect(get_db_path())
-            g.db.row_factory = sqlite3.Row
+        g.db = sqlite3.connect(get_db_path())
+        g.db.row_factory = sqlite3.Row
             g.db_type = 'sqlite'
     return g.db
 
@@ -65,8 +65,8 @@ def get_standalone_connection():
         import sqlite3
         path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'feedback.db')
         conn = sqlite3.connect(path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def execute_query(cursor, query, params=None):
@@ -175,6 +175,12 @@ def init_db():
                 FOREIGN KEY (category_id) REFERENCES kanban_categories(id)
             )
         """)
+        
+        # 为旧表添加 headers 列（如果不存在）
+        try:
+            cursor.execute("ALTER TABLE upload_batches ADD COLUMN headers TEXT")
+        except:
+            pass  # 列已存在，忽略错误
     else:
         # SQLite 语法
         cursor.execute("""
@@ -196,15 +202,15 @@ def init_db():
         except:
             pass
         
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS upload_batches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                filename TEXT NOT NULL,
-                total_count INTEGER DEFAULT 0,
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS upload_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            total_count INTEGER DEFAULT 0,
                 headers TEXT,
-                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
         
         # 尝试添加 headers 列（如果表已存在但没有这个列）
         try:
@@ -261,11 +267,11 @@ def create_upload_batch(filename: str, total_count: int, headers: str = None) ->
         )
         batch_id = cursor.fetchone()[0]
     else:
-        cursor.execute(
+    cursor.execute(
             "INSERT INTO upload_batches (filename, total_count, headers) VALUES (?, ?, ?)",
             (filename, total_count, headers)
-        )
-        batch_id = cursor.lastrowid
+    )
+    batch_id = cursor.lastrowid
     
     conn.commit()
     return batch_id
@@ -284,11 +290,11 @@ def insert_feedbacks_batch(batch_id: int, feedbacks: List[Dict]):
                 (batch_id, fb['user_type'], fb['content'], fb['category'], fb.get('attachment', ''), fb['original_row'])
             )
         else:
-            cursor.execute(
+        cursor.execute(
                 """INSERT INTO feedbacks (upload_batch_id, user_type, content, category, attachment, original_row) 
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 (batch_id, fb['user_type'], fb['content'], fb['category'], fb.get('attachment', ''), fb['original_row'])
-            )
+        )
     conn.commit()
 
 

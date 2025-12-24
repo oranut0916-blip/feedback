@@ -482,16 +482,20 @@ def get_kanban_categories():
 
 
 @api_bp.route('/kanban/categories', methods=['POST'])
-def create_kanban_category():
+def create_kanban_category_api():
     """创建看板分类"""
     data = request.get_json()
+    batch_id = data.get('batch_id')
     name = data.get('name', '').strip()
     color = data.get('color', '#3B82F6')
+    
+    if not batch_id:
+        return jsonify({"success": False, "detail": "缺少批次ID"}), 400
     
     if not name:
         return jsonify({"success": False, "detail": "分类名称不能为空"}), 400
     
-    category_id = db.create_kanban_category(name, color)
+    category_id = db.create_kanban_category(batch_id, name, color)
     
     return jsonify({
         "success": True,
