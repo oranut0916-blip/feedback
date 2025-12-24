@@ -43,8 +43,8 @@ def get_connection():
             g.db_type = 'postgres'
         else:
             import sqlite3
-        g.db = sqlite3.connect(get_db_path())
-        g.db.row_factory = sqlite3.Row
+            g.db = sqlite3.connect(get_db_path())
+            g.db.row_factory = sqlite3.Row
             g.db_type = 'sqlite'
     return g.db
 
@@ -117,8 +117,12 @@ def fetchone_as_dict(cursor):
 
 def init_db():
     """初始化数据库表"""
-    conn = get_standalone_connection()
-    cursor = conn.cursor()
+    try:
+        conn = get_standalone_connection()
+        cursor = conn.cursor()
+    except Exception as e:
+        print(f"数据库连接失败: {e}")
+        raise
     
     use_pg = os.environ.get('POSTGRES_URL') is not None
     
@@ -179,8 +183,12 @@ def init_db():
         # 为旧表添加 headers 列（如果不存在）
         try:
             cursor.execute("ALTER TABLE upload_batches ADD COLUMN headers TEXT")
-        except:
-            pass  # 列已存在，忽略错误
+            conn.commit()
+        except Exception as e:
+            conn.rollback()  # PostgreSQL 需要回滚失败的事务
+        
+        # 提交所有建表操作
+        conn.commit()
     else:
         # SQLite 语法
         cursor.execute("""
