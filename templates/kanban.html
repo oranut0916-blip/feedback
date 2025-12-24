@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重点反馈看板 - 用户反馈分析系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+        }
+        
+        .kanban-column {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-height: 400px;
+            transition: all 0.3s ease;
+        }
+        
+        .kanban-column:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .kanban-item {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+            cursor: grab;
+        }
+        
+        .kanban-item:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .kanban-item:active {
+            cursor: grabbing;
+        }
+        
+        .kanban-item.dragging {
+            opacity: 0.5;
+            transform: scale(1.02);
+        }
+        
+        .kanban-column.drag-over {
+            border-color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.1);
+        }
+        
+        .color-option {
+            transition: all 0.2s ease;
+        }
+        
+        .color-option:hover {
+            transform: scale(1.2);
+        }
+        
+        .color-option.selected {
+            ring: 2px;
+            ring-offset: 2px;
+            transform: scale(1.1);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .glow-purple {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+        }
+        
+        .category-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+        }
+        
+        /* 自定义滚动条 */
+        .kanban-items::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .kanban-items::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .kanban-items::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+        
+        /* 模态框动画 */
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+        
+        .modal-content {
+            transition: all 0.3s ease;
+        }
+        
+        /* 添加分类按钮动画 */
+        .add-category-btn {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .add-category-btn:hover {
+            border-color: rgba(139, 92, 246, 0.5);
+            background: rgba(139, 92, 246, 0.1);
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- 顶部导航 -->
+    <nav class="glass-card sticky top-0 z-50 border-b border-white/10">
+        <div class="max-w-full mx-auto px-6 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="flex items-center space-x-2 text-white/70 hover:text-white transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        <span class="text-sm">返回分析</span>
+                    </a>
+                    <div class="h-6 w-px bg-white/20"></div>
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
+                        </svg>
+                        <h1 class="text-lg font-semibold">重点反馈看板</h1>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2 text-sm text-white/60">
+                        <span>共</span>
+                        <span class="text-purple-400 font-medium" id="totalCount">{{ stats.total }}</span>
+                        <span>条重点反馈</span>
+                    </div>
+                    <button onclick="showAddCategoryModal()" 
+                            class="flex items-center space-x-1 bg-purple-500/80 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition glow-purple">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        <span>新建分类</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 看板主体 -->
+    <main class="px-6 py-6">
+        <div class="flex gap-4 overflow-x-auto pb-4" id="kanbanBoard">
+            <!-- 未分类列 -->
+            <div class="kanban-column rounded-xl min-w-[320px] max-w-[320px] flex flex-col" 
+                 data-category-id="null"
+                 ondragover="handleDragOver(event)" 
+                 ondrop="handleDrop(event, null)">
+                <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-gray-500"></div>
+                        <h3 class="font-medium text-white/90">未分类</h3>
+                        <span class="category-badge bg-white/10 text-white/60" id="uncategorized-count">
+                            {{ stats.uncategorized_count }}
+                        </span>
+                    </div>
+                    {% if kanban_data.get('未分类') and kanban_data['未分类']['feedback_list'] %}
+                    <button onclick="autoGenerateCategory()" 
+                            class="text-xs text-purple-400 hover:text-purple-300 transition flex items-center space-x-1"
+                            title="根据内容自动生成分类">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <span>智能分类</span>
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="kanban-items flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-220px)]">
+                    {% if kanban_data.get('未分类') %}
+                    {% for item in kanban_data['未分类']['feedback_list'] %}
+                    <div class="kanban-item rounded-lg p-3" 
+                         draggable="true"
+                         data-feedback-id="{{ item.feedback_id }}"
+                         ondragstart="handleDragStart(event, {{ item.feedback_id }})"
+                         ondragend="handleDragEnd(event)">
+                        <p class="text-sm text-white/80 leading-relaxed mb-2">{{ item.content }}</p>
+                        {% if item.attachment %}
+                        <div class="mb-2 flex items-start text-xs text-cyan-400">
+                            <svg class="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                            </svg>
+                            {% if item.attachment.startswith('http') %}
+                            <a href="{{ item.attachment }}" target="_blank" class="hover:underline break-all">
+                                {{ item.attachment }}
+                            </a>
+                            {% else %}
+                            <span class="text-white/60">附件: {{ item.attachment }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-purple-400/60">{{ item.original_category }}</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="{% if item.user_type == '会员' %}text-green-400{% else %}text-white/40{% endif %}">
+                                    {{ item.user_type }}
+                                </span>
+                                <button onclick="removeFromKanban({{ item.feedback_id }})" 
+                                        class="text-red-400/60 hover:text-red-400 transition">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 分类列 -->
+            {% for category_name, category_data in kanban_data.items() %}
+            {% if category_name != '未分类' %}
+            <div class="kanban-column rounded-xl min-w-[320px] max-w-[320px] flex flex-col" 
+                 data-category-id="{{ category_data.category_id }}"
+                 ondragover="handleDragOver(event)" 
+                 ondrop="handleDrop(event, {{ category_data.category_id }})">
+                <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 rounded-full" style="background-color: {{ category_data.color }}"></div>
+                        <h3 class="font-medium text-white/90">{{ category_name }}</h3>
+                        <span class="category-badge bg-white/10 text-white/60">
+                            {{ category_data.feedback_list|length }}
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button onclick="editCategory({{ category_data.category_id }}, '{{ category_name }}', '{{ category_data.color }}')" 
+                                class="p-1 text-white/40 hover:text-white/80 transition">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                        </button>
+                        <button onclick="deleteCategory({{ category_data.category_id }}, '{{ category_name }}')" 
+                                class="p-1 text-white/40 hover:text-red-400 transition">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="kanban-items flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-220px)]">
+                    {% for item in category_data.feedback_list %}
+                    <div class="kanban-item rounded-lg p-3" 
+                         draggable="true"
+                         data-feedback-id="{{ item.feedback_id }}"
+                         ondragstart="handleDragStart(event, {{ item.feedback_id }})"
+                         ondragend="handleDragEnd(event)">
+                        <p class="text-sm text-white/80 leading-relaxed mb-2">{{ item.content }}</p>
+                        {% if item.attachment %}
+                        <div class="mb-2 flex items-start text-xs text-cyan-400">
+                            <svg class="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                            </svg>
+                            {% if item.attachment.startswith('http') %}
+                            <a href="{{ item.attachment }}" target="_blank" class="hover:underline break-all">
+                                {{ item.attachment }}
+                            </a>
+                            {% else %}
+                            <span class="text-white/60">附件: {{ item.attachment }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-purple-400/60">{{ item.original_category }}</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="{% if item.user_type == '会员' %}text-green-400{% else %}text-white/40{% endif %}">
+                                    {{ item.user_type }}
+                                </span>
+                                <button onclick="removeFromKanban({{ item.feedback_id }})" 
+                                        class="text-red-400/60 hover:text-red-400 transition">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            <!-- 添加分类按钮 -->
+            <div class="add-category-btn rounded-xl min-w-[280px] max-w-[280px] flex items-center justify-center cursor-pointer"
+                 onclick="showAddCategoryModal()">
+                <div class="text-center text-white/40">
+                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span class="text-sm">添加分类</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 空状态 -->
+        {% if stats.total == 0 %}
+        <div class="flex flex-col items-center justify-center py-20">
+            <div class="glass-card rounded-2xl p-8 text-center max-w-md">
+                <svg class="w-16 h-16 mx-auto text-purple-400/40 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-white/80 mb-2">看板为空</h3>
+                <p class="text-sm text-white/50 mb-4">
+                    在反馈分析页面点击 <span class="text-purple-400">书签图标</span> 将重点反馈添加到看板
+                </p>
+                <a href="/" class="inline-flex items-center space-x-1 text-purple-400 hover:text-purple-300 transition text-sm">
+                    <span>前往反馈分析</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- 添加/编辑分类模态框 -->
+    <div id="categoryModal" class="fixed inset-0 z-50 hidden">
+        <div class="modal-backdrop absolute inset-0 bg-black/60" onclick="closeCategoryModal()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="modal-content glass-card rounded-2xl p-6 w-full max-w-md relative">
+                <h3 class="text-lg font-semibold mb-4" id="modalTitle">新建分类</h3>
+                <form onsubmit="submitCategory(event)">
+                    <input type="hidden" id="editCategoryId" value="">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-white/60 mb-2">分类名称</label>
+                            <input type="text" id="categoryName" 
+                                   class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:border-purple-400"
+                                   placeholder="输入分类名称">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-white/60 mb-2">选择颜色</label>
+                            <div class="flex flex-wrap gap-2" id="colorPicker">
+                                <button type="button" onclick="selectColor('#3B82F6')" class="color-option w-8 h-8 rounded-full bg-blue-500" data-color="#3B82F6"></button>
+                                <button type="button" onclick="selectColor('#8B5CF6')" class="color-option w-8 h-8 rounded-full bg-purple-500 selected ring-2 ring-offset-2 ring-offset-gray-900 ring-purple-400" data-color="#8B5CF6"></button>
+                                <button type="button" onclick="selectColor('#EC4899')" class="color-option w-8 h-8 rounded-full bg-pink-500" data-color="#EC4899"></button>
+                                <button type="button" onclick="selectColor('#EF4444')" class="color-option w-8 h-8 rounded-full bg-red-500" data-color="#EF4444"></button>
+                                <button type="button" onclick="selectColor('#F97316')" class="color-option w-8 h-8 rounded-full bg-orange-500" data-color="#F97316"></button>
+                                <button type="button" onclick="selectColor('#EAB308')" class="color-option w-8 h-8 rounded-full bg-yellow-500" data-color="#EAB308"></button>
+                                <button type="button" onclick="selectColor('#22C55E')" class="color-option w-8 h-8 rounded-full bg-green-500" data-color="#22C55E"></button>
+                                <button type="button" onclick="selectColor('#14B8A6')" class="color-option w-8 h-8 rounded-full bg-teal-500" data-color="#14B8A6"></button>
+                                <button type="button" onclick="selectColor('#06B6D4')" class="color-option w-8 h-8 rounded-full bg-cyan-500" data-color="#06B6D4"></button>
+                                <button type="button" onclick="selectColor('#6B7280')" class="color-option w-8 h-8 rounded-full bg-gray-500" data-color="#6B7280"></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" onclick="closeCategoryModal()" 
+                                class="px-4 py-2 text-white/60 hover:text-white transition">
+                            取消
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg transition">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示框 -->
+    <div id="toast" class="fixed bottom-4 right-4 transform translate-y-full opacity-0 transition-all duration-300 z-50">
+        <div class="glass-card text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2 text-sm">
+            <svg id="toastIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span id="toastMessage"></span>
+        </div>
+    </div>
+
+    <script>
+        let selectedColor = '#8B5CF6';
+        let draggedFeedbackId = null;
+
+        // 拖拽开始
+        function handleDragStart(event, feedbackId) {
+            draggedFeedbackId = feedbackId;
+            event.target.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+        }
+
+        // 拖拽结束
+        function handleDragEnd(event) {
+            event.target.classList.remove('dragging');
+            document.querySelectorAll('.kanban-column').forEach(col => {
+                col.classList.remove('drag-over');
+            });
+        }
+
+        // 拖拽经过
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        // 放置
+        async function handleDrop(event, categoryId) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            
+            if (draggedFeedbackId === null) return;
+            
+            try {
+                const response = await fetch('/api/kanban/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        feedback_id: draggedFeedbackId,
+                        category_id: categoryId
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('移动成功');
+                    // 刷新页面以更新看板
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast(data.detail || '移动失败', 'error');
+                }
+            } catch (error) {
+                showToast('操作失败: ' + error.message, 'error');
+            }
+            
+            draggedFeedbackId = null;
+        }
+
+        // 显示添加分类模态框
+        function showAddCategoryModal() {
+            document.getElementById('modalTitle').textContent = '新建分类';
+            document.getElementById('editCategoryId').value = '';
+            document.getElementById('categoryName').value = '';
+            selectColor('#8B5CF6');
+            document.getElementById('categoryModal').classList.remove('hidden');
+        }
+
+        // 编辑分类
+        function editCategory(categoryId, name, color) {
+            document.getElementById('modalTitle').textContent = '编辑分类';
+            document.getElementById('editCategoryId').value = categoryId;
+            document.getElementById('categoryName').value = name;
+            selectColor(color);
+            document.getElementById('categoryModal').classList.remove('hidden');
+        }
+
+        // 关闭模态框
+        function closeCategoryModal() {
+            document.getElementById('categoryModal').classList.add('hidden');
+        }
+
+        // 选择颜色
+        function selectColor(color) {
+            selectedColor = color;
+            document.querySelectorAll('.color-option').forEach(btn => {
+                btn.classList.remove('selected', 'ring-2', 'ring-offset-2', 'ring-offset-gray-900', 'ring-purple-400');
+                if (btn.dataset.color === color) {
+                    btn.classList.add('selected', 'ring-2', 'ring-offset-2', 'ring-offset-gray-900', 'ring-purple-400');
+                }
+            });
+        }
+
+        // 提交分类
+        async function submitCategory(event) {
+            event.preventDefault();
+            const name = document.getElementById('categoryName').value.trim();
+            const editId = document.getElementById('editCategoryId').value;
+            
+            if (!name) {
+                showToast('请输入分类名称', 'error');
+                return;
+            }
+            
+            try {
+                let response;
+                if (editId) {
+                    // 编辑
+                    response = await fetch(`/api/kanban/categories/${editId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, color: selectedColor })
+                    });
+                } else {
+                    // 新建
+                    response = await fetch('/api/kanban/categories', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, color: selectedColor })
+                    });
+                }
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast(editId ? '分类已更新' : '分类创建成功');
+                    closeCategoryModal();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast(data.detail || '操作失败', 'error');
+                }
+            } catch (error) {
+                showToast('操作失败: ' + error.message, 'error');
+            }
+        }
+
+        // 删除分类
+        async function deleteCategory(categoryId, name) {
+            if (!confirm(`确定要删除分类 "${name}" 吗？该分类下的反馈将变为未分类。`)) return;
+            
+            try {
+                const response = await fetch(`/api/kanban/categories/${categoryId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('分类已删除');
+                    setTimeout(() => location.reload(), 500);
+                }
+            } catch (error) {
+                showToast('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        // 从看板移除
+        async function removeFromKanban(feedbackId) {
+            if (!confirm('确定要从看板中移除这条反馈吗？')) return;
+            
+            try {
+                const response = await fetch('/api/kanban/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feedback_id: feedbackId })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('已从看板移除');
+                    setTimeout(() => location.reload(), 500);
+                }
+            } catch (error) {
+                showToast('移除失败: ' + error.message, 'error');
+            }
+        }
+
+        // 智能分类 - 自动生成分类名称
+        async function autoGenerateCategory() {
+            // 收集未分类的反馈ID
+            const uncategorizedItems = document.querySelectorAll('[data-category-id="null"] [data-feedback-id]');
+            const feedbackIds = Array.from(uncategorizedItems).map(item => parseInt(item.dataset.feedbackId));
+            
+            if (feedbackIds.length === 0) {
+                showToast('没有未分类的反馈', 'error');
+                return;
+            }
+            
+            try {
+                // 生成分类名称
+                const response = await fetch('/api/kanban/generate-category-name', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feedback_ids: feedbackIds })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    // 用生成的名称打开创建分类对话框
+                    document.getElementById('modalTitle').textContent = '智能生成分类';
+                    document.getElementById('editCategoryId').value = '';
+                    document.getElementById('categoryName').value = data.suggested_name;
+                    selectColor('#8B5CF6');
+                    document.getElementById('categoryModal').classList.remove('hidden');
+                    showToast(`建议分类名称: ${data.suggested_name}`);
+                }
+            } catch (error) {
+                showToast('生成失败: ' + error.message, 'error');
+            }
+        }
+
+        // 提示框
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.textContent = message;
+            if (type === 'error') {
+                toastIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+                toast.querySelector('div').style.borderColor = 'rgba(239, 68, 68, 0.5)';
+            } else {
+                toastIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+                toast.querySelector('div').style.borderColor = 'rgba(139, 92, 246, 0.5)';
+            }
+            toast.classList.remove('translate-y-full', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-full', 'opacity-0'), 3000);
+        }
+
+        // 格式化日期时间
+        function formatDateTime(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    </script>
+</body>
+</html>
+

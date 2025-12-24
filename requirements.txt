@@ -2,3 +2,6 @@
 Flask>=2.3.0
 Jinja2>=3.0.0
 Werkzeug>=2.3.0
+
+# PostgreSQL 数据库 (Vercel Postgres)
+psycopg2-binary>=2.9.0
