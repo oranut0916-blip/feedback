@@ -639,18 +639,6 @@ def get_batches_info():
     return jsonify({"batches": result})
 
 
-@api_bp.route('/health', methods=['GET'])
-def health_check():
-    """健康检查 - 用于调试"""
-    import os
-    postgres_url = os.environ.get('POSTGRES_URL')
-    return jsonify({
-        "status": "ok",
-        "has_postgres_url": postgres_url is not None,
-        "postgres_url_prefix": postgres_url[:30] + "..." if postgres_url else None
-    })
-
-
 # 注册数据库连接清理
 @main_bp.teardown_app_request
 def teardown_db(exception):
