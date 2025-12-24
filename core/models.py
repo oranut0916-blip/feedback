@@ -128,6 +128,17 @@ def init_db():
     
     if use_pg:
         # PostgreSQL 语法
+        # 先创建上传批次表（其他表依赖它）
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS upload_batches (
+                id SERIAL PRIMARY KEY,
+                filename TEXT NOT NULL,
+                total_count INTEGER DEFAULT 0,
+                headers TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # 创建反馈表
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS feedbacks (
@@ -139,17 +150,6 @@ def init_db():
                 attachment TEXT,
                 original_row TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # 创建上传批次表
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS upload_batches (
-                id SERIAL PRIMARY KEY,
-                filename TEXT NOT NULL,
-                total_count INTEGER DEFAULT 0,
-                headers TEXT,
-                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
@@ -191,6 +191,24 @@ def init_db():
         conn.commit()
     else:
         # SQLite 语法
+        # 先创建上传批次表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS upload_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                total_count INTEGER DEFAULT 0,
+                headers TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 尝试添加 headers 列（如果表已存在但没有这个列）
+        try:
+            cursor.execute("ALTER TABLE upload_batches ADD COLUMN headers TEXT")
+        except:
+            pass
+        
+        # 创建反馈表
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS feedbacks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,22 +225,6 @@ def init_db():
         # 尝试添加 attachment 列
         try:
             cursor.execute("ALTER TABLE feedbacks ADD COLUMN attachment TEXT")
-        except:
-            pass
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS upload_batches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                filename TEXT NOT NULL,
-                total_count INTEGER DEFAULT 0,
-                headers TEXT,
-                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # 尝试添加 headers 列（如果表已存在但没有这个列）
-        try:
-            cursor.execute("ALTER TABLE upload_batches ADD COLUMN headers TEXT")
         except:
             pass
         
