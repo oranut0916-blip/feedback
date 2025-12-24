@@ -65,8 +65,8 @@ def get_standalone_connection():
         import sqlite3
         path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'feedback.db')
         conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    return conn
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 def execute_query(cursor, query, params=None):
