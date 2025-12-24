@@ -210,15 +210,15 @@ def init_db():
         except:
             pass
         
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS upload_batches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT NOT NULL,
-            total_count INTEGER DEFAULT 0,
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS upload_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                total_count INTEGER DEFAULT 0,
                 headers TEXT,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         
         # 尝试添加 headers 列（如果表已存在但没有这个列）
         try:
