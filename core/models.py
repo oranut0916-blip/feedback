@@ -275,11 +275,11 @@ def create_upload_batch(filename: str, total_count: int, headers: str = None) ->
         )
         batch_id = cursor.fetchone()[0]
     else:
-    cursor.execute(
+        cursor.execute(
             "INSERT INTO upload_batches (filename, total_count, headers) VALUES (?, ?, ?)",
             (filename, total_count, headers)
-    )
-    batch_id = cursor.lastrowid
+        )
+        batch_id = cursor.lastrowid
     
     conn.commit()
     return batch_id
@@ -298,11 +298,11 @@ def insert_feedbacks_batch(batch_id: int, feedbacks: List[Dict]):
                 (batch_id, fb['user_type'], fb['content'], fb['category'], fb.get('attachment', ''), fb['original_row'])
             )
         else:
-        cursor.execute(
+            cursor.execute(
                 """INSERT INTO feedbacks (upload_batch_id, user_type, content, category, attachment, original_row) 
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 (batch_id, fb['user_type'], fb['content'], fb['category'], fb.get('attachment', ''), fb['original_row'])
-        )
+            )
     conn.commit()
 
 
