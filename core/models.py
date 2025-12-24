@@ -58,12 +58,17 @@ def close_connection(e=None):
 
 def get_standalone_connection():
     """获取独立数据库连接（非Flask上下文）"""
-    if os.environ.get('POSTGRES_URL'):
+    postgres_url = os.environ.get('POSTGRES_URL')
+    print(f"POSTGRES_URL 存在: {postgres_url is not None}")
+    
+    if postgres_url:
         import psycopg2
-        return psycopg2.connect(os.environ.get('POSTGRES_URL'))
+        print(f"连接 PostgreSQL: {postgres_url[:30]}...")
+        return psycopg2.connect(postgres_url)
     else:
         import sqlite3
         path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'feedback.db')
+        print(f"连接 SQLite: {path}")
         conn = sqlite3.connect(path)
         conn.row_factory = sqlite3.Row
         return conn
@@ -128,6 +133,8 @@ def init_db():
     
     if use_pg:
         # PostgreSQL 语法
+        print("正在初始化 PostgreSQL 数据库...")
+        
         # 先创建上传批次表（其他表依赖它）
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS upload_batches (
@@ -180,15 +187,9 @@ def init_db():
             )
         """)
         
-        # 为旧表添加 headers 列（如果不存在）
-        try:
-            cursor.execute("ALTER TABLE upload_batches ADD COLUMN headers TEXT")
-            conn.commit()
-        except Exception as e:
-            conn.rollback()  # PostgreSQL 需要回滚失败的事务
-        
-        # 提交所有建表操作
+        # 先提交所有建表操作
         conn.commit()
+        print("PostgreSQL 数据库表创建完成")
     else:
         # SQLite 语法
         # 先创建上传批次表
